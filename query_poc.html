@@ -139,7 +139,7 @@
   <script>
     // 🔗 這裡改成打向我們自己的後端路由（此處設定為相對路徑，適用於 Vercel 等平台部署）
     const BACKEND_API_URL = '/api/translate';
-
+    // 觸發 Vercel 同步，就要 commit GitHub code, 然後他就會去同步。
     async function handleQuery() {
       const input = document.getElementById('input').value.trim();
       if (!input) return;
