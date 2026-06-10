@@ -115,3 +115,155 @@
       border: none;
       border-radius: 8px;
       cursor: pointer;
+    }
+    .modal button:hover { background: #3a6abf; }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h1>統計數據查詢</h1>
+    <p class="subtitle">用自然語言描述你想查的內容</p>
+    <textarea id="input" placeholder="例如：做工的人男生去年薪水多少？"></textarea>
+    <button class="query-btn" id="queryBtn" onclick="handleQuery()">查詢</button>
+  </div>
+
+  <div class="modal-overlay" id="modal">
+    <div class="modal">
+      <h2 id="modal-title"><span class="spinner"></span> Translating...</h2>
+      <p id="modal-text">AI 正在分析查詢條件...</p>
+      <button id="ok-btn" onclick="closeModal()" style="display:none;">OK</button>
+    </div>
+  </div>
+
+  <script>
+    // ⚠️ 請在下方單引號內填入你的 Gemini API Key
+    const API_KEY = 'AQ.Ab8RN6JaJ8RlK8jjgncyZxreLoL82SolzPdVlYR_wUXk5ziieA'; 
+    const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + API_KEY;
+
+    const SYSTEM_PROMPT = `你是薪情平台的查詢轉譯助理。薪情平台是台灣主計總處的官方薪資統計查詢系統。
+你的任務是將使用者的自然語言輸入，轉譯成薪情平台可能對應的查詢條件，以繁體中文回覆。
+
+薪情平台常見的查詢維度包括：
+- 行業別（例：製造業、零售業、營建工程業、金融及保險業等）
+- 職業別（例：技藝有關工作人員、專業人員等）
+- 性別（男、女、不分性別）
+- 年份（民國年或西元年）
+- 統計指標（每人每月總薪資、經常性薪資、非經常性薪資、工時等）
+- 學歷（不分學歷、國中及以下、高中職、大專、研究所以上）
+- 空間範圍（全國、縣市）
+
+請嚴格以以下格式回覆：
+
+【轉譯結果】
+行業別：...
+職業別：...（若無法判斷則填「不限」）
+性別：...
+年份：...
+統計指標：...
+學歷：...
+空間範圍：...
+
+【備註】
+簡短說明轉譯邏輯或不確定之處（1-2句話）`;
+
+    async function handleQuery() {
+      const input = document.getElementById('input').value.trim();
+      if (!input) return;
+
+      const btn = document.getElementById('queryBtn');
+      btn.disabled = true;
+
+      // 1. 顯示載入中彈出視窗
+      document.getElementById('modal-title').innerHTML = '<span class="spinner"></span> Translating...';
+      document.getElementById('modal-text').textContent = 'AI 正在分析查詢條件...';
+      document.getElementById('ok-btn').style.display = 'none';
+      document.getElementById('modal').classList.add('show');
+
+      try {
+        // 2. 將角色規則與輸入融合成一段話，完美繞過針對 systemInstruction 欄位的 401 審查限制
+        const combinedPrompt = SYSTEM_PROMPT + "\n\n====================\n\n現在請嚴格依照上述規則與格式，幫我轉譯這句話：\n" + input;
+        
+        // 使用 JSON.stringify 安全處理字串，避免換行或特殊引號破壞 JSON 結構
+        const escapedCombined = JSON.stringify(combinedPrompt);
+
+        const rawJsonString = `{
+          "contents": [
+            {
+              "parts": [
+                { "text": ${escapedCombined} }
+              ]
+            }
+          ]
+        }`;
+
+        // 3. 發送網路請求
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json'
+          },
+          body: rawJsonString
+        });
+
+        // 4. 錯誤狀態攔截 (400, 401, 403, 429 等)
+        if (!response.ok) {
+          const errorJson = await response.json();
+          document.getElementById('modal-title').textContent = 'API 伺服器回報錯誤 (' + response.status + ')';
+          document.getElementById('modal-text').textContent = "【伺服器原始錯誤訊息】\n" + JSON.stringify(errorJson, null, 2);
+          document.getElementById('ok-btn').style.display = 'block';
+          return;
+        }
+
+        // 5. 成功 200 OK，解析並萃取 AI 文字
+        const data = await response.json();
+        const aiResponseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        let finalShowText = "";
+        if (aiResponseText) {
+          finalShowText = aiResponseText;
+          document.getElementById('modal-title').textContent = '轉譯結果';
+        } else {
+          finalShowText = "【連線成功，但未獲得預期文字回覆。原始回傳 JSON 如下：】\n\n" + JSON.stringify(data, null, 2);
+          document.getElementById('modal-title').textContent = '原始回傳資料';
+        }
+
+        document.getElementById('modal-text').textContent = finalShowText;
+        document.getElementById('ok-btn').style.display = 'block';
+
+      } catch (e) {
+        // 6. 捕捉本地端嚴重錯誤
+        document.getElementById('modal-title').textContent = '本地端連線失敗';
+        document.getElementById('modal-text').textContent = '發生 Exception：' + e.message;
+        document.getElementById('ok-btn').style.display = 'block';
+      } finally {
+        // 7. 恢復按鈕功能
+        btn.disabled = false;
+      }
+    }
+
+    function closeModal() {
+      document.getElementById('modal').classList.remove('show');
+    }
+
+    // UX：按 Enter 送出
+    document.getElementById('input').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) { 
+        e.preventDefault(); 
+        handleQuery(); 
+      }
+    });
+
+    // UX：點擊遮罩關閉
+    document.getElementById('modal').addEventListener('click', function(e) {
+      if (e.target === this) closeModal();
+    });
+
+    // UX：按 ESC 鍵關閉
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') closeModal(); 
+    });
+  </script>
+
+</body>
+</html>
