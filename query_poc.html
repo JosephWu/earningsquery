@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>統計數據查詢</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f0f4f8;
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 40px;
+      width: 100%;
+      max-width: 520px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 600;
+      color: #1a1a2e;
+      margin-bottom: 8px;
+    }
+
+    p.subtitle {
+      font-size: 14px;
+      color: #888;
+      margin-bottom: 28px;
+    }
+
+    textarea {
+      width: 100%;
+      height: 110px;
+      padding: 14px 16px;
+      font-size: 15px;
+      font-family: inherit;
+      color: #1a1a2e;
+      border: 1.5px solid #dde3ec;
+      border-radius: 8px;
+      resize: none;
+      outline: none;
+      transition: border-color 0.2s;
+      line-height: 1.6;
+    }
+
+    textarea::placeholder { color: #bbb; }
+    textarea:focus { border-color: #4a7fcb; }
+
+    button.query-btn {
+      margin-top: 16px;
+      width: 100%;
+      padding: 13px;
+      font-size: 15px;
+      font-weight: 600;
+      color: #fff;
+      background: #4a7fcb;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button.query-btn:hover { background: #3a6abf; }
+    button.query-btn:active { background: #2d5aad; }
+
+    /* Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.35);
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    .modal-overlay.show { display: flex; }
+
+    .modal {
+      background: #fff;
+      border-radius: 12px;
+      padding: 32px 28px 24px;
+      width: 90%;
+      max-width: 360px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.15);
+      text-align: center;
+    }
+
+    .modal h2 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #1a1a2e;
+      margin-bottom: 10px;
+    }
+
+    .modal p {
+      font-size: 14px;
+      color: #555;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+
+    .modal button {
+      padding: 10px 32px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #fff;
+      background: #4a7fcb;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .modal button:hover { background: #3a6abf; }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h1>統計數據查詢</h1>
+    <p class="subtitle">用自然語言描述你想查的內容</p>
+    <textarea id="input" placeholder="例如：做工的人男生去年薪水多少？"></textarea>
+    <button class="query-btn" onclick="handleQuery()">查詢</button>
+  </div>
+
+  <div class="modal-overlay" id="modal">
+    <div class="modal">
+      <h2>Hello World</h2>
+      <p id="modal-text">這裡之後會顯示 AI 轉譯的結果。</p>
+      <button onclick="closeModal()">OK</button>
+    </div>
+  </div>
+
+  <script>
+    function handleQuery() {
+      const input = document.getElementById('input').value.trim();
+      if (!input) return;
+      document.getElementById('modal-text').textContent = '你輸入了：「' + input + '」';
+      document.getElementById('modal').classList.add('show');
+    }
+
+    function closeModal() {
+      document.getElementById('modal').classList.remove('show');
+    }
+
+    // 按 Enter 也可以送出（Shift+Enter 換行）
+    document.getElementById('input').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleQuery();
+      }
+    });
+
+    // 點 overlay 背景關閉
+    document.getElementById('modal').addEventListener('click', function(e) {
+      if (e.target === this) closeModal();
+    });
+  </script>
+
+</body>
+</html>
