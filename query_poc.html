@@ -193,12 +193,27 @@
         };
 
         // 3. 發送 POST 網路請求 (相當於 OkHttp / Retrofit)
+        /*
         const response = await fetch(API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(requestBody)
         });
+        */
 
+        // 3-1. 移除網址後面的 ?key=，讓網址保持乾淨
+        const CLEAN_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+
+        // 3-2. 改用 HTTP Header 帶入 API Key
+        const response = await fetch(CLEAN_URL, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-goog-api-key': API_KEY // 👈 關鍵！把 Key 藏在 Header 裡
+          },
+          body: JSON.stringify(requestBody)
+        });
+        
         // 4. 防呆攔截：如果 HTTP 狀態碼不是 200~299 (例如 400 Key 錯、403 超過配額)
         if (!response.ok) {
           const errorJson = await response.json();
