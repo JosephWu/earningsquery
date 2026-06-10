@@ -6,7 +6,6 @@
   <title>統計數據查詢</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-
     body {
       min-height: 100vh;
       display: flex;
@@ -15,7 +14,6 @@
       background: #f0f4f8;
       font-family: 'Helvetica Neue', Arial, sans-serif;
     }
-
     .card {
       background: #fff;
       border-radius: 12px;
@@ -24,20 +22,8 @@
       max-width: 520px;
       box-shadow: 0 4px 24px rgba(0,0,0,0.08);
     }
-
-    h1 {
-      font-size: 20px;
-      font-weight: 600;
-      color: #1a1a2e;
-      margin-bottom: 8px;
-    }
-
-    p.subtitle {
-      font-size: 14px;
-      color: #888;
-      margin-bottom: 28px;
-    }
-
+    h1 { font-size: 20px; font-weight: 600; color: #1a1a2e; margin-bottom: 8px; }
+    p.subtitle { font-size: 14px; color: #888; margin-bottom: 28px; }
     textarea {
       width: 100%;
       height: 110px;
@@ -52,10 +38,8 @@
       transition: border-color 0.2s;
       line-height: 1.6;
     }
-
     textarea::placeholder { color: #bbb; }
     textarea:focus { border-color: #4a7fcb; }
-
     button.query-btn {
       margin-top: 16px;
       width: 100%;
@@ -69,11 +53,8 @@
       cursor: pointer;
       transition: background 0.2s;
     }
-
     button.query-btn:hover { background: #3a6abf; }
-    button.query-btn:active { background: #2d5aad; }
-
-    /* Modal */
+    button.query-btn:disabled { background: #a0b8e0; cursor: not-allowed; }
     .modal-overlay {
       display: none;
       position: fixed;
@@ -83,35 +64,45 @@
       justify-content: center;
       z-index: 100;
     }
-
     .modal-overlay.show { display: flex; }
-
     .modal {
       background: #fff;
       border-radius: 12px;
       padding: 32px 28px 24px;
       width: 90%;
-      max-width: 360px;
+      max-width: 400px;
       box-shadow: 0 8px 40px rgba(0,0,0,0.15);
-      text-align: center;
     }
-
     .modal h2 {
-      font-size: 18px;
+      font-size: 16px;
       font-weight: 600;
-      color: #1a1a2e;
-      margin-bottom: 10px;
+      color: #888;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
-
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid #dde3ec;
+      border-top-color: #4a7fcb;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
     .modal p {
       font-size: 14px;
-      color: #555;
-      line-height: 1.6;
+      color: #333;
+      line-height: 1.8;
       margin-bottom: 24px;
+      white-space: pre-wrap;
     }
-
     .modal button {
-      padding: 10px 32px;
+      width: 100%;
+      padding: 10px;
       font-size: 14px;
       font-weight: 600;
       color: #fff;
@@ -119,9 +110,7 @@
       border: none;
       border-radius: 8px;
       cursor: pointer;
-      transition: background 0.2s;
     }
-
     .modal button:hover { background: #3a6abf; }
   </style>
 </head>
@@ -131,40 +120,100 @@
     <h1>統計數據查詢</h1>
     <p class="subtitle">用自然語言描述你想查的內容</p>
     <textarea id="input" placeholder="例如：做工的人男生去年薪水多少？"></textarea>
-    <button class="query-btn" onclick="handleQuery()">查詢</button>
+    <button class="query-btn" id="queryBtn" onclick="handleQuery()">查詢</button>
   </div>
 
   <div class="modal-overlay" id="modal">
     <div class="modal">
-      <h2>Hello World</h2>
-      <p id="modal-text">這裡之後會顯示 AI 轉譯的結果。</p>
-      <button onclick="closeModal()">OK</button>
+      <h2 id="modal-title"><span class="spinner"></span> Translating...</h2>
+      <p id="modal-text">AI 正在分析查詢條件...</p>
+      <button id="ok-btn" onclick="closeModal()" style="display:none;">OK</button>
     </div>
   </div>
 
   <script>
-    function handleQuery() {
+    const API_KEY = 'AQ.Ab8RN6KvFO2GaLNrC7lSLn4byQz2gf4enGpxhD5_fqkhjrmZjg';
+    const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + API_KEY;
+
+    const SYSTEM_PROMPT = `你是薪情平台的查詢轉譯助理。薪情平台是台灣主計總處的官方薪資統計查詢系統。
+
+你的任務是將使用者的自然語言輸入，轉譯成薪情平台可能對應的查詢條件，以繁體中文回覆。
+
+薪情平台常見的查詢維度包括：
+- 行業別（例：製造業、零售業、營建工程業、金融及保險業等）
+- 職業別（例：技藝有關工作人員、專業人員等）
+- 性別（男、女、不分性別）
+- 年份（民國年或西元年）
+- 統計指標（每人每月總薪資、經常性薪資、非經常性薪資、工時等）
+- 學歷（不分學歷、國中及以下、高中職、大專、研究所以上）
+- 空間範圍（全國、縣市）
+
+請以以下格式回覆：
+
+【轉譯結果】
+行業別：...
+職業別：...（若無法判斷則填「不限」）
+性別：...
+年份：...
+統計指標：...
+學歷：...
+空間範圍：...
+
+【備註】
+簡短說明轉譯邏輯或不確定之處（1-2句話）`;
+
+    async function handleQuery() {
       const input = document.getElementById('input').value.trim();
       if (!input) return;
-      document.getElementById('modal-text').textContent = '你輸入了：「' + input + '」';
+
+      const btn = document.getElementById('queryBtn');
+      btn.disabled = true;
+
+      document.getElementById('modal-title').innerHTML = '<span class="spinner"></span> Translating...';
+      document.getElementById('modal-text').textContent = 'AI 正在分析查詢條件...';
+      document.getElementById('ok-btn').style.display = 'none';
       document.getElementById('modal').classList.add('show');
+
+      try {
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+            contents: [{ parts: [{ text: input }] }]
+          })
+        });
+
+        const data = await response.json();
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '無法取得回應';
+
+        document.getElementById('modal-title').textContent = '轉譯結果';
+        document.getElementById('modal-text').textContent = text;
+        document.getElementById('ok-btn').style.display = 'block';
+
+      } catch (e) {
+        document.getElementById('modal-title').textContent = '錯誤';
+        document.getElementById('modal-text').textContent = '連線失敗：' + e.message;
+        document.getElementById('ok-btn').style.display = 'block';
+      } finally {
+        btn.disabled = false;
+      }
     }
 
     function closeModal() {
       document.getElementById('modal').classList.remove('show');
     }
 
-    // 按 Enter 也可以送出（Shift+Enter 換行）
     document.getElementById('input').addEventListener('keydown', function(e) {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        handleQuery();
-      }
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleQuery(); }
     });
 
-    // 點 overlay 背景關閉
     document.getElementById('modal').addEventListener('click', function(e) {
       if (e.target === this) closeModal();
+    });
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') closeModal(); 
     });
   </script>
 
