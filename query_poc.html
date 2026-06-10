@@ -185,8 +185,21 @@
         });
 
         const data = await response.json();
-        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '無法取得回應';
+        //const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '無法取得回應';
+        // 1. 檢查有沒有撈到 AI 的文字
+        const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
+        // 2. 準備要在對話框顯示的內容
+        let displayText = "";
+        if (aiText) {
+          // 如果有成功拿到 AI 的話，就顯示 AI 的話
+          displayText = aiText;
+        } else {
+          // 如果拿不到（例如 error 或結構變了），就直接把整包回傳的 JSON 轉成漂亮的字串丟出來！
+          // 參數解析：data 是物件，null 代表不篩選欄位，2 代表縮排 2 個空格（Pretty Print）
+          displayText = "【無法解析預期欄位，以下為原始回傳的 JSON 資料】\n\n" + JSON.stringify(data, null, 2);
+        }
+        
         document.getElementById('modal-title').textContent = '轉譯結果';
         document.getElementById('modal-text').textContent = text;
         document.getElementById('ok-btn').style.display = 'block';
