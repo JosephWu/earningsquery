@@ -1,1 +1,1 @@
-# earningsquery
+# earnings query
