@@ -1,11 +1,30 @@
 // api/translate.js
 export default async function handler(req, res) {
-  // 1. 限制只能用 POST 請求
+  // ==========================================
+  // 【第一步：設定 CORS Headers，處理預檢請求】
+  // ==========================================
+  
+  // 1. 允許你的 GitHub Pages 跨網域存取
+  res.setHeader('Access-Control-Allow-Origin', 'https://josephwu.github.io');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  // 2. 處理瀏覽器的預檢請求 (Preflight / OPTIONS)
+  // 必須在檢查 POST 之前處理，否則預檢請求會被 405 擋掉
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  // ==========================================
+  // 【第二步：你原本的商業邏輯與防呆機制】
+  // ==========================================
+
+  // 3. 限制只能用 POST 請求 (這時候來的就只會是真正的 POST 了)
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
-  // 500
-  // 2. 從環境變數中讀取 API Key (這就是把 Key 藏起來的關鍵)
+
+  // 4. 從環境變數中讀取 API Key
   const API_KEY = process.env.GEMINI_API_KEY;
   if (!API_KEY) {
     return res.status(500).json({ error: '後端未設定 GEMINI_API_KEY 環境變數' });
@@ -54,10 +73,11 @@ export default async function handler(req, res) {
 
     const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || '未獲得預期回覆';
     
-    // 回傳給前端
+    // 成功回傳給前端
     return res.status(200).json({ result: aiText });
 
   } catch (error) {
+    // 萬一發生異常，也依然確保用 JSON 格式回傳，不會噴 HTML
     return res.status(500).json({ error: '後端執行 Exception', message: error.message });
   }
 }
