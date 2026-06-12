@@ -52,7 +52,7 @@ export default async function handler(req, res) {
 簡短說明轉譯邏輯或不確定之處（1-2句話）`;
 
   try {
-    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`;
+    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
     
     // 把 System Prompt 和使用者輸入在後端組合
     const combinedPrompt = `${SYSTEM_PROMPT}\n\n====================\n\n現在請轉譯這句話：\n${prompt}`;
