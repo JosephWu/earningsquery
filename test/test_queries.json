@@ -1,0 +1,16 @@
+[
+  {
+    "query": "GG碩士男生薪資",
+    "expected": {
+      "industry": ["I024"],
+      "education": ["E005"],
+      "gender": ["G001"]
+    }
+  },
+  {
+    "query": "金融業薪資",
+    "expected": {
+      "industry": ["I080"]
+    }
+  }
+]
