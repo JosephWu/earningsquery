@@ -1,4 +1,7 @@
-// api/translate.js
+// pages/api/translate.js
+import fs from 'fs';
+import path from 'path';
+
 export default async function handler(req, res) {
   // 1. 設定 CORS Headers，處理預檢請求
   res.setHeader('Access-Control-Allow-Origin', 'https://josephwu.github.io');
@@ -25,43 +28,46 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing prompt in request body' });
   }
 
-  // 4. 定義嚴格的 System Prompt 與對照標準
+  // ==========================================
+  // 【核心黑科技：動態讀取你的本機 CSV 檔案】
+  // ==========================================
+  let csvContext = "";
+  try {
+    // 取得根目錄下的 CSV 路徑（假設你的 csv 放在專案最外層根目錄）
+    const taxonomyPath = path.join(process.cwd(), 'taxonomy.csv');
+    const synonymsPath = path.join(process.cwd(), 'synonyms.csv');
+
+    const taxonomyData = fs.readFileSync(taxonomyPath, 'utf8');
+    const synonymsData = fs.readFileSync(synonymsPath, 'utf8');
+
+    csvContext = `
+【權威資料庫 1：標準行業別分類 (Taxonomy)】
+${taxonomyData}
+
+【權威資料庫 2：口語同義詞對照表 (Synonyms)】
+${synonymsData}
+`;
+  } catch (csvError) {
+    console.error("讀取 CSV 失敗，降級使用內建 Prompt", csvError);
+    // 如果檔案路徑不對，可以先放個簡單的備用文字防止程式崩潰
+    csvContext = "（暫時無法讀取 CSV 對照表，請根據已知台灣行業別嘗試通用的分類）";
+  }
+
+  // 4. 定義嚴格的 System Prompt，將 CSV 內容當作 Context 餵給 Gemini
   const SYSTEM_PROMPT = `你是一個嚴格的台灣主計總處「薪情平台」自然語言查詢轉譯器。
 你的任務是分析使用者的口語化輸入，並將其嚴格對照到指定的「行業別代碼(target_id)」。
 
-【行業別與同義詞對照權威資料庫】
-以下是使用者可能輸入的口語關鍵字與對應的標準代碼：
-- 工業/服務業/工及服務 -> "I001"
-- 製造業/製造 -> "I006"
-- 食品製造/飼品製造 -> "I007"
-- 飲料製造/菸草製造 -> "I008"
-- 紡織業/紡織 -> "I009"
-- 電子零組件製造 -> "I026"
-- 電腦/電子產品/光學製品製造 -> "I027"
-- 電力設備製造 -> "I028"
-- 機械設備製造 -> "I029"
-- 汽車/零件製造 -> "I030"
-- 營建工程業/營造業/建築工程 -> "I043"
-- 批發及零售業/買賣業/零售/批發 -> "I048"
-- 運輸及倉儲業/貨運/客運/倉儲 -> "I053"
-- 住宿及餐飲業/飯店/餐廳/餐飲/住宿 -> "I058"
-- 出版/影音製作/傳播/資通訊服務 -> "I062"
-- 軟體出版/數位內容 -> "I063"
-- 電信業/通訊業 -> "I066"
-- 資訊服務業/軟體設計/程式研發 -> "I067"
-- 金融及保險業/銀行/保險/證券 -> "I069"
-- 不動產業/房地產/仲介 -> "I082"
-- 專業科學技術/法律/會計/管顧/工程設計/研發 -> "I087"
-- 醫療保健/醫院/診所/社會工作 -> "I107"
-- 藝術/娛樂/休閒服務 -> "I110"
+以下是系統目前擁有的權威對照資料庫（包含標準代碼與口語同義詞）：
+${csvContext}
 
 【轉譯鐵律】
 1. 分析使用者的輸入，找出他想查詢的「行業別」。
-2. 從上方的權威資料庫中，找到最精確符合的標準代碼（例如 "I006"）。如果使用者講的很模糊（如：做生意的），請嘗試歸類到最接近的（如批發零售 "I048"）。
-3. 如果使用者輸入的內容完全跟行業別無關、或者完全無法辨識，行業別代碼請務必填寫 "UNKNOWN"。
-4. 統計指標預設為 "earnings" (總薪資)，除非明確提到時薪或別的指標。
+2. 請死命地比對【權威資料庫 2】中的 keyword。如果使用者的口語命中 keyword，請找出對應的 target_id。
+3. 如果沒有完全命中的關鍵字，請比對【權威資料庫 1】中的 name，嘗試歸類到最接近的行業別（例如：做生意的 -> 歸類到批發零售業 I048）。
+4. 如果使用者輸入的內容完全跟行業別無關、或者完全無法辨識，行業別代碼請務必填寫 "UNKNOWN"。
+5. 統計指標預設為 "earnings" (總薪資)，除非明確提到時薪或別的指標。
 
-【回傳規範】你必須嚴格遵守 JSON Schema 格式回傳，不得包含任何額外的 Markdown 標籤或 markdown 區塊包裹。`;
+【回傳規範】你必須嚴格遵守 JSON Schema 格式回傳，不得包含任何額外的 Markdown 標籤。`;
 
   // 5. 建立呼叫 Gemini API 的 Payload（啟用 JSON 強制輸出模式）
   const API_URL = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
@@ -81,11 +87,11 @@ export default async function handler(req, res) {
         properties: {
           industry_code: { 
             type: "string", 
-            description: "對應的官方行業別代碼，例如 I006。若無法識別則填 UNKNOWN" 
+            description: "對應的官方行業別代碼，例如 I006 或 I067。若無法識別則填 UNKNOWN" 
           },
           industry_name: { 
             type: "string", 
-            description: "該代碼對應的標準官方名稱，例如 製造業" 
+            description: "該代碼對應的標準官方名稱，例如 製造業、資訊服務業" 
           },
           metric: { 
             type: "string", 
